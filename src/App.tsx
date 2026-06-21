@@ -32,7 +32,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-50 max-w-lg mx-auto">
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto min-h-0">
         {activeTab === 'ledger' ? (
           <>
             <BalanceHeader balance={balance} loading={txLoading} />

@@ -32,7 +32,7 @@ export function SplitView({ stats, settlement }: SplitViewProps) {
       {/* Per-person rows */}
       <div className={`divide-y divide-zinc-800/60 ${stats.length > 1 ? '' : ''}`}>
         {stats.map((s) => {
-          const isAhead = s.net >= 0;
+          const isOwed = s.netBalance >= 0;
           return (
             <div key={s.id} className="flex items-center gap-3 px-4 py-2.5">
               {/* Avatar */}
@@ -46,23 +46,23 @@ export function SplitView({ stats, settlement }: SplitViewProps) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-200 truncate">{s.name}</p>
                 <p className="text-xs text-zinc-600 mono">
-                  Fronted {formatINR(s.expensesPaid)}
+                  Paid {formatINR(s.expensesPaid)}
                   {' · '}
-                  Share {formatINR(s.incomeShare)}
+                  Collected {formatINR(s.incomeReceived)}
                 </p>
               </div>
 
               {/* Net position badge */}
               <div
                 className={`shrink-0 flex items-center gap-1 rounded-md px-2 py-1 ${
-                  isAhead
+                  isOwed
                     ? 'bg-emerald-500/10 text-emerald-400'
                     : 'bg-rose-500/10 text-rose-400'
                 }`}
               >
                 <span className="mono text-xs font-semibold">
-                  {isAhead ? '+' : '−'}
-                  {formatINR(s.net)}
+                  {isOwed ? '+' : '−'}
+                  {formatINR(s.netBalance)}
                 </span>
               </div>
             </div>

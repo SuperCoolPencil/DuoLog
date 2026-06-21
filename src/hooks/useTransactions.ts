@@ -10,9 +10,9 @@ const SELECT_QUERY = `
 export interface ContributorStat {
   id: string;
   name: string;
-  incomeShare: number;   // equal cut of total income
-  expensesPaid: number;  // what they've personally fronted
-  net: number;           // incomeShare - expensesPaid
+  incomeReceived: number;
+  expensesPaid: number;
+  netBalance: number;
 }
 
 export interface Settlement {
@@ -111,28 +111,45 @@ export function useTransactions(contributors: { id: string; name: string }[]) {
       .filter((t) => t.type === 'INCOME')
       .reduce((s, t) => s + Number(t.amount), 0);
 
-    const incomeShareEach = totalIncome / contributors.length;
+    const totalExpense = transactions
+      .filter((t) => t.type === 'EXPENSE')
+      .reduce((s, t) => s + Number(t.amount), 0);
+
+    const totalNetWorth = totalIncome - totalExpense;
+    const fairShare = totalNetWorth / contributors.length;
+
     const expenseByContributor: Record<string, number> = {};
-    for (const c of contributors) expenseByContributor[c.id] = 0;
+    const incomeByContributor: Record<string, number> = {};
+    for (const c of contributors) {
+      expenseByContributor[c.id] = 0;
+      incomeByContributor[c.id] = 0;
+    }
 
     for (const tx of transactions) {
-      if (tx.type === 'EXPENSE' && tx.contributor_id && tx.contributor_id in expenseByContributor) {
-        expenseByContributor[tx.contributor_id] += Number(tx.amount);
+      if (tx.contributor_id) {
+        if (tx.type === 'EXPENSE' && tx.contributor_id in expenseByContributor) {
+          expenseByContributor[tx.contributor_id] += Number(tx.amount);
+        } else if (tx.type === 'INCOME' && tx.contributor_id in incomeByContributor) {
+          incomeByContributor[tx.contributor_id] += Number(tx.amount);
+        }
       }
     }
 
     return contributors.map((c) => {
       const expensesPaid = expenseByContributor[c.id] ?? 0;
-      return { id: c.id, name: c.name, incomeShare: incomeShareEach, expensesPaid, net: incomeShareEach - expensesPaid };
+      const incomeReceived = incomeByContributor[c.id] ?? 0;
+      const heldAmount = incomeReceived - expensesPaid;
+      const netBalance = fairShare - heldAmount;
+      return { id: c.id, name: c.name, incomeReceived, expensesPaid, netBalance };
     });
   }, [transactions, contributors]);
 
   const settlement: Settlement | null = useMemo(() => {
     if (contributorStats.length < 2) return null;
-    const sorted = [...contributorStats].sort((a, b) => a.net - b.net);
-    const debtor = sorted[0];
-    const creditor = sorted[sorted.length - 1];
-    const amount = Math.abs(debtor.net - creditor.net) / 2;
+    const sorted = [...contributorStats].sort((a, b) => a.netBalance - b.netBalance);
+    const debtor = sorted[0]; // Most negative netBalance (Owes money)
+    const creditor = sorted[sorted.length - 1]; // Most positive netBalance (Owed money)
+    const amount = creditor.netBalance;
     if (amount < 0.01) return null;
     return { from: debtor.name, to: creditor.name, amount };
   }, [contributorStats]);

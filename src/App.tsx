@@ -7,7 +7,6 @@ import { SettingsView } from './components/SettingsView';
 import { SplitView } from './components/SplitView';
 import { useTransactions } from './hooks/useTransactions';
 import { useContributors } from './hooks/useContributors';
-import { useCategories } from './hooks/useCategories';
 
 type Tab = 'ledger' | 'settings';
 
@@ -22,14 +21,6 @@ export default function App() {
   } = useContributors();
 
   const {
-    categories,
-    addCategory,
-    updateCategory,
-    deleteCategory,
-  } = useCategories();
-
-  // Pass contributors so the hook can compute per-person stats
-  const {
     transactions,
     balance,
     loading: txLoading,
@@ -41,17 +32,12 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-50 max-w-lg mx-auto">
-      {/* Main content area */}
       <main className="flex-1 overflow-y-auto">
         {activeTab === 'ledger' ? (
           <>
             <BalanceHeader balance={balance} loading={txLoading} />
             <SplitView stats={contributorStats} settlement={settlement} />
-            <TransactionForm
-              categories={categories}
-              contributors={contributors}
-              onAdd={addTransaction}
-            />
+            <TransactionForm contributors={contributors} onAdd={addTransaction} />
             <TransactionFeed
               transactions={transactions}
               loading={txLoading}
@@ -60,20 +46,15 @@ export default function App() {
           </>
         ) : (
           <>
-            {/* Settings header */}
             <div className="px-4 pt-6 pb-2 border-b border-zinc-800">
               <h1 className="text-lg font-semibold text-zinc-50">Settings</h1>
-              <p className="text-xs text-zinc-500 mt-0.5">Manage contributors and categories</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Manage contributors</p>
             </div>
             <SettingsView
               contributors={contributors}
-              categories={categories}
               onAddContributor={addContributor}
               onUpdateContributor={updateContributor}
               onDeleteContributor={deleteContributor}
-              onAddCategory={addCategory}
-              onUpdateCategory={updateCategory}
-              onDeleteCategory={deleteCategory}
             />
           </>
         )}

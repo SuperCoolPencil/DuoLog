@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Trash2, ArrowUpRight, ArrowDownRight, ChevronDown } from 'lucide-react';
 import type { Transaction } from '../types';
 
 interface TransactionFeedProps {
@@ -8,13 +8,25 @@ interface TransactionFeedProps {
   onDelete: (id: string) => Promise<void>;
 }
 
-function formatDate(iso: string): string {
+function formatDateShort(iso: string): string {
   return new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
     month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(iso));
+}
+
+function formatDateFull(iso: string): string {
+  return new Intl.DateTimeFormat('en-IN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hour12: true,
   }).format(new Date(iso));
 }
@@ -29,15 +41,22 @@ function formatINR(amount: number): string {
 }
 
 export function TransactionFeed({ transactions, loading, onDelete }: TransactionFeedProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const handleDeleteClick = useCallback((id: string) => {
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const handleDeleteClick = useCallback((e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // don't toggle expand when tapping delete
     setConfirmId(id);
   }, []);
 
   const handleConfirmDelete = useCallback(
-    async (id: string) => {
+    async (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
       setDeletingId(id);
       setConfirmId(null);
       try {
@@ -49,11 +68,19 @@ export function TransactionFeed({ transactions, loading, onDelete }: Transaction
     [onDelete],
   );
 
+  const handleCancelDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmId(null);
+  }, []);
+
   if (loading) {
     return (
       <div className="px-4 space-y-3 py-4">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-16 rounded-xl bg-zinc-900 animate-pulse border border-zinc-800" />
+        {[...Array(4)].map((_, i) => (
+          <div
+            key={i}
+            className="h-16 rounded-xl bg-zinc-900 animate-pulse border border-zinc-800"
+          />
         ))}
       </div>
     );
@@ -75,102 +102,171 @@ export function TransactionFeed({ transactions, loading, onDelete }: Transaction
 
   return (
     <div className="px-4 pb-24 pt-2 space-y-2">
-      <p className="section-title pt-2">{transactions.length} Transaction{transactions.length !== 1 ? 's' : ''}</p>
+      <p className="section-title pt-2">
+        {transactions.length} Transaction{transactions.length !== 1 ? 's' : ''}
+      </p>
 
       {transactions.map((tx) => {
         const isIncome = tx.type === 'INCOME';
         const isDeleting = deletingId === tx.id;
         const isConfirming = confirmId === tx.id;
+        const isExpanded = expandedId === tx.id;
 
         return (
           <article
             key={tx.id}
             className={`relative card overflow-hidden transition-opacity duration-150 ${isDeleting ? 'opacity-40' : ''}`}
-            aria-label={`${tx.type === 'INCOME' ? 'Income' : 'Expense'}: ${formatINR(tx.amount)}`}
+            aria-label={`${isIncome ? 'Income' : 'Expense'}: ${formatINR(tx.amount)}`}
           >
-            {/* Left border accent */}
+            {/* Left accent bar */}
             <div
               className={`absolute left-0 top-0 bottom-0 w-0.5 ${isIncome ? 'bg-emerald-500' : 'bg-rose-500'}`}
             />
 
-            <div className="pl-4 pr-3 py-3 flex items-start gap-3">
-              {/* Icon */}
+            {/* Main row — tappable */}
+            <button
+              type="button"
+              onClick={() => toggleExpand(tx.id)}
+              className="w-full text-left pl-4 pr-3 py-3 flex items-center gap-3"
+              id={`tx-row-${tx.id}`}
+              aria-expanded={isExpanded}
+            >
+              {/* Type icon */}
               <div
-                className={`shrink-0 mt-0.5 w-7 h-7 rounded-md flex items-center justify-center ${
+                className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
                   isIncome ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
                 }`}
               >
-                {isIncome ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                {isIncome ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
               </div>
 
-              {/* Details */}
+              {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-zinc-100 truncate">
-                      {tx.categories?.name ?? 'Uncategorized'}
+                <p className="text-sm font-medium text-zinc-100 truncate">
+                  {tx.description || (isIncome ? 'Income' : 'Expense')}
+                </p>
+                <p className="text-xs text-zinc-600 mono mt-0.5">
+                  {formatDateShort(tx.date)}
+                  {tx.contributors?.name && (
+                    <span className="text-zinc-700"> · {tx.contributors.name}</span>
+                  )}
+                </p>
+              </div>
+
+              {/* Amount + chevron */}
+              <div className="shrink-0 flex items-center gap-2">
+                <span
+                  className={`mono text-sm font-semibold ${
+                    isIncome ? 'text-emerald-400' : 'text-rose-400'
+                  }`}
+                >
+                  {isIncome ? '+' : '−'}
+                  {formatINR(tx.amount)}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className={`text-zinc-700 shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                />
+              </div>
+            </button>
+
+            {/* Expanded detail panel */}
+            {isExpanded && (
+              <div className="border-t border-zinc-800 pl-4 pr-3 py-3 bg-zinc-900/60 space-y-2.5">
+                {/* Full description */}
+                <div>
+                  <p className="text-xs text-zinc-600 uppercase tracking-wider font-medium mb-0.5">
+                    Description
+                  </p>
+                  <p className="text-sm text-zinc-300">
+                    {tx.description || <span className="text-zinc-600 italic">No description</span>}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Contributor */}
+                  <div>
+                    <p className="text-xs text-zinc-600 uppercase tracking-wider font-medium mb-0.5">
+                      {isIncome ? 'Received by' : 'Paid by'}
                     </p>
-                    {tx.description && (
-                      <p className="text-xs text-zinc-500 mt-0.5 truncate">{tx.description}</p>
-                    )}
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-zinc-600 mono">{formatDate(tx.date)}</span>
-                      {tx.contributors?.name && (
-                        <>
-                          <span className="text-zinc-800 text-xs">·</span>
-                          <span className="text-xs text-zinc-500">{tx.contributors.name}</span>
-                        </>
-                      )}
-                    </div>
+                    <p className="text-sm text-zinc-300">
+                      {tx.contributors?.name ?? <span className="text-zinc-600">—</span>}
+                    </p>
                   </div>
 
-                  {/* Amount */}
-                  <div className="shrink-0 text-right">
+                  {/* Type */}
+                  <div>
+                    <p className="text-xs text-zinc-600 uppercase tracking-wider font-medium mb-0.5">
+                      Type
+                    </p>
                     <span
-                      className={`mono text-sm font-semibold ${
-                        isIncome ? 'text-emerald-400' : 'text-rose-400'
+                      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md ${
+                        isIncome
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : 'bg-rose-500/10 text-rose-400'
                       }`}
                     >
-                      {isIncome ? '+' : '−'}
-                      {formatINR(tx.amount)}
+                      {isIncome ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                      {isIncome ? 'Income' : 'Expense'}
                     </span>
                   </div>
-                </div>
-              </div>
 
-              {/* Delete controls */}
-              <div className="shrink-0 flex items-center gap-1 ml-1">
-                {isConfirming ? (
-                  <>
+                  {/* Exact amount */}
+                  <div>
+                    <p className="text-xs text-zinc-600 uppercase tracking-wider font-medium mb-0.5">
+                      Amount
+                    </p>
+                    <p className={`mono text-sm font-semibold ${isIncome ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {isIncome ? '+' : '−'}{formatINR(tx.amount)}
+                    </p>
+                  </div>
+
+                  {/* Full date */}
+                  <div>
+                    <p className="text-xs text-zinc-600 uppercase tracking-wider font-medium mb-0.5">
+                      Date
+                    </p>
+                    <p className="mono text-xs text-zinc-400 leading-relaxed">
+                      {formatDateFull(tx.date)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Delete controls */}
+                <div className="pt-1 flex justify-end">
+                  {isConfirming ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-zinc-500">Delete this entry?</span>
+                      <button
+                        onClick={handleCancelDelete}
+                        className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded border border-zinc-800 transition-colors"
+                        id={`cancel-delete-${tx.id}`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={(e) => handleConfirmDelete(e, tx.id)}
+                        className="text-xs text-rose-400 px-2 py-1 rounded border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+                        id={`confirm-delete-${tx.id}`}
+                        disabled={isDeleting}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => setConfirmId(null)}
-                      className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded transition-colors"
-                      id={`cancel-delete-${tx.id}`}
-                    >
-                      No
-                    </button>
-                    <button
-                      onClick={() => handleConfirmDelete(tx.id)}
-                      className="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 rounded border border-rose-500/20 bg-rose-500/10 transition-colors"
-                      id={`confirm-delete-${tx.id}`}
+                      onClick={(e) => handleDeleteClick(e, tx.id)}
+                      className="flex items-center gap-1.5 text-xs text-zinc-600 hover:text-rose-400 transition-colors px-2 py-1 rounded hover:bg-rose-500/10"
+                      id={`delete-${tx.id}`}
                       disabled={isDeleting}
                     >
-                      Yes
+                      <Trash2 size={13} />
+                      Delete
                     </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => handleDeleteClick(tx.id)}
-                    className="p-1.5 rounded-md text-zinc-700 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                    aria-label="Delete transaction"
-                    id={`delete-${tx.id}`}
-                    disabled={isDeleting}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </article>
         );
       })}

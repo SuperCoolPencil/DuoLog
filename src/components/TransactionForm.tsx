@@ -2,39 +2,35 @@ import { useState, useCallback, type FormEvent } from 'react';
 import { PlusCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
-import type { Category, Contributor, NewTransaction } from '../types';
+import type { Contributor, NewTransaction } from '../types';
 
 interface TransactionFormProps {
-  categories: Category[];
   contributors: Contributor[];
   onAdd: (tx: NewTransaction) => Promise<void>;
 }
 
 type FormMode = 'INCOME' | 'EXPENSE' | null;
 
-const todayISO = () => new Date().toISOString().slice(0, 16); // datetime-local format
+const todayISO = () => new Date().toISOString().slice(0, 16);
 
-export function TransactionForm({ categories, contributors, onAdd }: TransactionFormProps) {
+export function TransactionForm({ contributors, onAdd }: TransactionFormProps) {
   const [mode, setMode] = useState<FormMode>(null);
   const [amount, setAmount] = useState('');
-  const [categoryId, setCategoryId] = useState('');
   const [contributorId, setContributorId] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(todayISO());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const filteredCategories = categories.filter((c) => c.type === mode);
-
   const openModal = useCallback((m: FormMode) => {
     setMode(m);
     setAmount('');
-    setCategoryId('');
-    setContributorId('');
+    // Pre-select if only one contributor
+    setContributorId(contributors.length === 1 ? contributors[0].id : '');
     setDescription('');
     setDate(todayISO());
     setError('');
-  }, []);
+  }, [contributors]);
 
   const closeModal = useCallback(() => {
     setMode(null);
@@ -51,20 +47,18 @@ export function TransactionForm({ categories, contributors, onAdd }: Transaction
         setError('Enter a valid amount greater than 0.');
         return;
       }
-      if (!categoryId) {
-        setError('Please select a category.');
+      if (!contributorId) {
+        setError('Select who is making this transaction.');
         return;
       }
 
       setSubmitting(true);
       setError('');
-
       try {
         await onAdd({
           type: mode,
           amount: parsedAmount,
-          category_id: categoryId || null,
-          contributor_id: mode === 'EXPENSE' ? contributorId || null : null,
+          contributor_id: contributorId,
           description: description.trim(),
           date: new Date(date).toISOString(),
         });
@@ -75,7 +69,7 @@ export function TransactionForm({ categories, contributors, onAdd }: Transaction
         setSubmitting(false);
       }
     },
-    [mode, amount, categoryId, contributorId, description, date, onAdd, closeModal],
+    [mode, amount, contributorId, description, date, onAdd, closeModal],
   );
 
   return (
@@ -113,10 +107,7 @@ export function TransactionForm({ categories, contributors, onAdd }: Transaction
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           {/* Amount */}
           <div>
-            <label
-              htmlFor="tx-amount"
-              className="block text-xs font-medium text-zinc-400 mb-1.5"
-            >
+            <label htmlFor="tx-amount" className="block text-xs font-medium text-zinc-400 mb-1.5">
               Amount (₹)
             </label>
             <div className="relative">
@@ -139,68 +130,40 @@ export function TransactionForm({ categories, contributors, onAdd }: Transaction
             </div>
           </div>
 
-          {/* Category */}
+          {/* Contributor — required for both income and expense */}
           <div>
             <label
-              htmlFor="tx-category"
+              htmlFor="tx-contributor"
               className="block text-xs font-medium text-zinc-400 mb-1.5"
             >
-              Category
+              {mode === 'INCOME' ? 'Received by' : 'Paid by'}
             </label>
-            {filteredCategories.length === 0 ? (
+            {contributors.length === 0 ? (
               <p className="text-xs text-zinc-500 border border-zinc-800 rounded-lg px-3 py-2.5">
-                No {mode === 'INCOME' ? 'income' : 'expense'} categories yet. Add them in Settings.
+                No contributors yet — add them in Settings first.
               </p>
             ) : (
-              <select
-                id="tx-category"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="input-base"
-                required
-              >
-                <option value="" disabled>
-                  Select a category…
-                </option>
-                {filteredCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(contributors.length, 3)}, 1fr)` }}>
+                {contributors.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    id={`contributor-pick-${c.id}`}
+                    onClick={() => setContributorId(c.id)}
+                    className={`py-2.5 px-3 rounded-lg border text-sm font-medium transition-all duration-100 ${
+                      contributorId === c.id
+                        ? mode === 'INCOME'
+                          ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300'
+                          : 'border-rose-500/60 bg-rose-500/10 text-rose-300'
+                        : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                    }`}
+                  >
                     {c.name}
-                  </option>
+                  </button>
                 ))}
-              </select>
+              </div>
             )}
           </div>
-
-          {/* Contributor — only for EXPENSE */}
-          {mode === 'EXPENSE' && (
-            <div>
-              <label
-                htmlFor="tx-contributor"
-                className="block text-xs font-medium text-zinc-400 mb-1.5"
-              >
-                Paid by
-              </label>
-              {contributors.length === 0 ? (
-                <p className="text-xs text-zinc-500 border border-zinc-800 rounded-lg px-3 py-2.5">
-                  No contributors yet. Add them in Settings.
-                </p>
-              ) : (
-                <select
-                  id="tx-contributor"
-                  value={contributorId}
-                  onChange={(e) => setContributorId(e.target.value)}
-                  className="input-base"
-                >
-                  <option value="">— Unassigned —</option>
-                  {contributors.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
 
           {/* Description */}
           <div>
@@ -224,7 +187,7 @@ export function TransactionForm({ categories, contributors, onAdd }: Transaction
           {/* Date */}
           <div>
             <label htmlFor="tx-date" className="block text-xs font-medium text-zinc-400 mb-1.5">
-              Date & Time
+              Date &amp; Time
             </label>
             <input
               id="tx-date"
@@ -245,13 +208,7 @@ export function TransactionForm({ categories, contributors, onAdd }: Transaction
 
           {/* Submit */}
           <div className="flex gap-3 pt-1 pb-2">
-            <Button
-              type="button"
-              variant="ghost"
-              fullWidth
-              onClick={closeModal}
-              id="tx-cancel-btn"
-            >
+            <Button type="button" variant="ghost" fullWidth onClick={closeModal} id="tx-cancel-btn">
               Cancel
             </Button>
             <Button

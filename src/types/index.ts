@@ -3,30 +3,21 @@ export interface Contributor {
   name: string;
 }
 
-export interface Category {
-  id: string;
-  name: string;
-  type: 'INCOME' | 'EXPENSE';
-}
-
 export interface Transaction {
   id: string;
   type: 'INCOME' | 'EXPENSE';
   amount: number;
-  category_id: string | null;
   contributor_id: string | null;
   description: string | null;
   date: string;
-  // Joined relations
-  categories: { name: string } | null;
+  // Joined relation
   contributors: { name: string } | null;
 }
 
 export interface NewTransaction {
   type: 'INCOME' | 'EXPENSE';
   amount: number;
-  category_id: string | null;
-  contributor_id: string | null;
+  contributor_id: string;
   description: string;
   date: string;
 }

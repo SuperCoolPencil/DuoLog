@@ -149,7 +149,7 @@ export function useTransactions(contributors: { id: string; name: string }[]) {
     const sorted = [...contributorStats].sort((a, b) => a.netBalance - b.netBalance);
     const debtor = sorted[0]; // Most negative netBalance (Owes money)
     const creditor = sorted[sorted.length - 1]; // Most positive netBalance (Owed money)
-    const amount = creditor.netBalance;
+    const amount = Math.min(Math.abs(debtor.netBalance), creditor.netBalance);
     if (amount < 0.01) return null;
     return { from: debtor.name, to: creditor.name, amount };
   }, [contributorStats]);

@@ -1,4 +1,4 @@
-import { error, json, sql } from './_lib/db';
+import { error, json, sql } from './_lib/db.js';
 
 const selectTransactions = sql`
   SELECT t.id, t.type, t.amount, t.contributor_id, t.description, t.date,

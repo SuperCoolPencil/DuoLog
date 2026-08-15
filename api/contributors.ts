@@ -1,4 +1,4 @@
-import { error, json, sql } from './_lib/db';
+import { error, json, sql } from './_lib/db.js';
 
 async function handler(request: Request) {
   if (request.method === 'GET') {

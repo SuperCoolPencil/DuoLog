@@ -19,25 +19,7 @@ This creates the `contributors` and `transactions` tables and their required ind
 
 Copy your Neon pooled connection string. It is used only by Vercel API functions and must never be exposed to the browser.
 
-### 3. Migrate existing Supabase data (one time)
-
-After running the Neon schema, add these three values to a local `.env.local` file:
-
-```
-DATABASE_URL=your-neon-pooled-connection-string
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-old-supabase-service-role-key
-```
-
-Get the service-role key from Supabase **Project Settings → API**. Run:
-
-```bash
-bun run migrate:supabase
-```
-
-The script copies contributors and transactions with their original IDs, so the transaction relationships stay intact. It is safe to run again: existing rows are updated, not duplicated. Never add the Supabase service-role key to Vercel or to frontend environment variables.
-
-### 4. Create Your `.env`
+### 3. Create Your `.env`
 
 ```bash
 cp .env.example .env
@@ -48,7 +30,7 @@ Edit `.env` and fill in your values:
 DATABASE_URL=postgresql://...
 ```
 
-### 5. Run Locally
+### 4. Run Locally
 
 ```bash
 bun install   # or npm install

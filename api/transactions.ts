@@ -8,7 +8,7 @@ const selectTransactions = sql`
   ORDER BY t.date DESC
 `;
 
-export default async function handler(request: Request) {
+async function handler(request: Request) {
   if (request.method === 'GET') return json(await selectTransactions);
 
   if (request.method === 'POST') {
@@ -44,3 +44,5 @@ export default async function handler(request: Request) {
 
   return error('Method not allowed.', 405);
 }
+
+export default { fetch: handler };

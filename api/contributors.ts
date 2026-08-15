@@ -1,6 +1,6 @@
 import { error, json, sql } from './_lib/db';
 
-export default async function handler(request: Request) {
+async function handler(request: Request) {
   if (request.method === 'GET') {
     const contributors = await sql`SELECT id, name FROM contributors ORDER BY name`;
     return json(contributors);
@@ -45,3 +45,5 @@ export default async function handler(request: Request) {
 
   return error('Method not allowed.', 405);
 }
+
+export default { fetch: handler };

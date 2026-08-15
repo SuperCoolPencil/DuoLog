@@ -22,7 +22,7 @@ export function DatabaseLoadingScreen({
         <h1 className="text-lg font-semibold">Opening DuoLog</h1>
         <p className="mt-1 max-w-xs text-sm leading-6 text-zinc-500">
           {hasLoadError
-            ? 'We could not reach the database. If this is a paused Supabase Free project, its owner must resume it in Supabase Studio.'
+            ? 'We could not reach the ledger database. Check the connection and try again.'
             : isTakingLonger
               ? 'Still connecting to your shared ledger…'
             : 'Connecting to your shared ledger…'}

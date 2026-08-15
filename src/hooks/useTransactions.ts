@@ -1,11 +1,6 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { ledgerApi } from '../lib/api';
 import type { Transaction, NewTransaction } from '../types';
-
-const SELECT_QUERY = `
-  id, type, amount, contributor_id, description, date,
-  contributors ( name )
-`;
 
 export interface ContributorStat {
   id: string;
@@ -24,73 +19,36 @@ export interface Settlement {
 export function useTransactions(contributors: { id: string; name: string }[]) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   const fetchAll = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select(SELECT_QUERY)
-      .order('date', { ascending: false });
-    if (!error && data) setTransactions(data as unknown as Transaction[]);
-    setLoading(false);
+    try {
+      setTransactions(await ledgerApi.transactions());
+      setError(null);
+    } catch (queryError) {
+      setError(queryError instanceof Error ? queryError : new Error('Unable to load transactions'));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    fetchAll();
-
-    const channel = supabase
-      .channel('transactions-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'transactions' },
-        async (payload) => {
-          const { data } = await supabase
-            .from('transactions')
-            .select(SELECT_QUERY)
-            .eq('id', payload.new.id)
-            .single();
-          if (data) setTransactions((prev) => [data as unknown as Transaction, ...prev]);
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'transactions' },
-        async (payload) => {
-          const { data } = await supabase
-            .from('transactions')
-            .select(SELECT_QUERY)
-            .eq('id', payload.new.id)
-            .single();
-          if (data) {
-            setTransactions((prev) =>
-              prev.map((t) => (t.id === payload.new.id ? (data as unknown as Transaction) : t)),
-            );
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'transactions' },
-        (payload) => {
-          setTransactions((prev) => prev.filter((t) => t.id !== payload.old.id));
-        },
-      )
-      .subscribe();
-
-    channelRef.current = channel;
+    const initialFetch = window.setTimeout(() => void fetchAll(), 0);
+    const interval = window.setInterval(() => void fetchAll(), 15_000);
     return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      window.clearTimeout(initialFetch);
+      window.clearInterval(interval);
     };
   }, [fetchAll]);
 
   const addTransaction = useCallback(async (tx: NewTransaction) => {
-    const { error } = await supabase.from('transactions').insert(tx);
-    if (error) throw error;
+    const transaction = await ledgerApi.addTransaction(tx);
+    setTransactions((prev) => [transaction, ...prev]);
   }, []);
 
   const deleteTransaction = useCallback(async (id: string) => {
-    const { error } = await supabase.from('transactions').delete().eq('id', id);
-    if (error) throw error;
+    await ledgerApi.deleteTransaction(id);
+    setTransactions((prev) => prev.filter((transaction) => transaction.id !== id));
   }, []);
 
   // ── Derived stats ──────────────────────────────────────────────────────────
@@ -154,5 +112,14 @@ export function useTransactions(contributors: { id: string; name: string }[]) {
     return { from: debtor.name, to: creditor.name, amount };
   }, [contributorStats]);
 
-  return { transactions, balance, loading, addTransaction, deleteTransaction, contributorStats, settlement };
+  return {
+    transactions,
+    balance,
+    loading,
+    error,
+    addTransaction,
+    deleteTransaction,
+    contributorStats,
+    settlement,
+  };
 }

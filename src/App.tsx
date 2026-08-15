@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BookOpen, Settings } from 'lucide-react';
 import { BalanceHeader } from './components/BalanceHeader';
 import { TransactionForm } from './components/TransactionForm';
 import { TransactionFeed } from './components/TransactionFeed';
 import { SettingsView } from './components/SettingsView';
 import { SplitView } from './components/SplitView';
+import { DatabaseLoadingScreen } from './components/DatabaseLoadingScreen';
 import { useTransactions } from './hooks/useTransactions';
 import { useContributors } from './hooks/useContributors';
 
@@ -15,6 +16,8 @@ export default function App() {
 
   const {
     contributors,
+    loading: contributorsLoading,
+    error: contributorsError,
     addContributor,
     updateContributor,
     deleteContributor,
@@ -24,11 +27,27 @@ export default function App() {
     transactions,
     balance,
     loading: txLoading,
+    error: transactionsError,
     addTransaction,
     deleteTransaction,
     contributorStats,
     settlement,
   } = useTransactions(contributors);
+
+  const [isTakingLonger, setIsTakingLonger] = useState(false);
+  const isLoading = contributorsLoading || txLoading;
+  const hasLoadError = Boolean(contributorsError || transactionsError);
+
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const timer = window.setTimeout(() => setIsTakingLonger(true), 4_000);
+    return () => window.clearTimeout(timer);
+  }, [isLoading]);
+
+  if (isLoading || hasLoadError) {
+    return <DatabaseLoadingScreen isTakingLonger={isTakingLonger} hasLoadError={hasLoadError} />;
+  }
 
   return (
     <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-50 max-w-lg mx-auto">
